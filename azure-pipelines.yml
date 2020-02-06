@@ -2,12 +2,12 @@ trigger:
   branches:
     include:
     - master
-    - refs/tags/*
+    - refs/tags/v*.*.*-*
 
 jobs:
 - job:
   displayName: 'Snapshot build'
-  condition: eq(variables['build.sourceBranch'], 'refs/heads/master')
+  condition: eq(variables['Build.SourceBranch'], 'refs/heads/master')
   pool:
     vmImage: 'ubuntu-latest'
 
@@ -20,5 +20,26 @@ jobs:
   - script: sudo apk add build-base openjdk11 maven
     displayName: 'Setup prerequisite(s)'
 
-  - script: mvn -Drevision=$(Build.BuildNumber) clean install
+  - script: |
+      mvn versions:set -DnewVersion=$(Build.BuildNumber)
+      mvn clean install
+
     displayName: 'Build artifact(s)'
+
+- job:
+  displayName: 'Release build'
+  condition: startsWith(variables['Build.SourceBranch'], 'refs/tags/')
+  pool:
+    vmImage: 'ubuntu-latest'
+
+  container: nicholasterry/azure-pipelines-alpine:latest
+
+  steps:
+    - checkout: self
+      submodules: true
+
+    - script: sudo apk add build-base openjdk11 maven
+      displayName: 'Setup prerequisite(s)'
+
+    - script: mvn -Drevision=$(Build.BuildNumber) clean install
+      displayName: 'Build artifact(s)'
