@@ -41,5 +41,9 @@ jobs:
     - script: sudo apk add build-base openjdk11 maven
       displayName: 'Setup prerequisite(s)'
 
-    - script: mvn -Drevision=$(Build.BuildNumber) clean install
+    - script: |
+        versionTag=$(echo '$(Build.SourceBranchName)' | tr -d 'v')
+        mvn versions:set -DnewVersion=${versionTag}
+        mvn clean install
+
       displayName: 'Build artifact(s)'
