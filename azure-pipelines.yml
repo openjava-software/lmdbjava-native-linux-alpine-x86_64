@@ -2,12 +2,12 @@ trigger:
   branches:
     include:
     - master
-    - refs/tags/*
+    - refs/tags/v*.*.*-*
 
 jobs:
 - job:
   displayName: 'Snapshot build'
-  condition: eq(variables['build.sourceBranch'], 'refs/heads/master')
+  condition: eq(variables['Build.SourceBranch'], 'refs/heads/master')
   pool:
     vmImage: 'ubuntu-latest'
 
@@ -17,8 +17,47 @@ jobs:
   - checkout: self
     submodules: true
 
+  - task: DownloadSecureFile@1
+    name: settingsXml
+    displayName: 'Download settings.xml'
+    inputs:
+      secureFile: 'settings.xml'
+
   - script: sudo apk add build-base openjdk11 maven
     displayName: 'Setup prerequisite(s)'
 
-  - script: mvn -Drevision=$(Build.BuildNumber) clean install
-    displayName: 'Build artifact(s)'
+  - script: |
+      version=$(Build.BuildNumber)-SNAPSHOT
+      mvn versions:set -DnewVersion=${version}
+      mvn --settings '$(settingsXml.secureFilePath)' clean package deploy:deploy
+
+    displayName: 'Build and publish artifact(s)'
+
+
+- job:
+  displayName: 'Release build'
+  condition: startsWith(variables['Build.SourceBranch'], 'refs/tags/')
+  pool:
+    vmImage: 'ubuntu-latest'
+
+  container: nicholasterry/azure-pipelines-alpine:latest
+
+  steps:
+  - checkout: self
+    submodules: true
+
+  - task: DownloadSecureFile@1
+    name: settingsXml
+    displayName: 'Download settings.xml'
+    inputs:
+      secureFile: 'settings.xml'
+
+  - script: sudo apk add build-base openjdk11 maven
+    displayName: 'Setup prerequisite(s)'
+
+  - script: |
+      version=$(echo '$(Build.SourceBranchName)' | tr -d 'v')
+      mvn versions:set -DnewVersion=${version}
+      mvn --settings '$(settingsXml.secureFilePath)' clean package deploy:deploy
+
+    displayName: 'Build and publish artifact(s)'
